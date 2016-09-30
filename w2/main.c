@@ -18,34 +18,41 @@ typedef struct {
 
 	Nit_bimap *funcs;
 	Nit_hset *stuff;
-} W1;
+
+	int bound_max;
+} W2;
+
+typedef struct {
+	int steps;
+	Nit_entry_list *point;
+} Bound;
 
 void
 goal_check(Nit_hset *stuff, int goal, int in)
 {
 	if (hset_contains(stuff, &in, sizeof(in))) {
 		printf("%i -> %i\n", in, goal);
-		/* hset_copy_add(stuff, &goal, sizeof(goal)); */
+		hset_copy_add(stuff, &goal, sizeof(goal));
 		return;
 	}
 }
 
 void
-func_check(W1 *w1, int goal)
+func_check(W2 *w2, int goal, int bounds)
 {
-	Nit_entry_list *ins = bimap_rget(w1->funcs, &goal, sizeof(goal));
+	Nit_entry_list *ins = bimap_rget(w2->funcs, &goal, sizeof(goal));
 
 	foreach (ins)
-		goal_check(w1->stuff, goal, *(int *) ins->entry->dat);
+		goal_check(w2->stuff, goal, *(int *) ins->entry->dat);
 }
 
 void
-run(W1 *w1)
+run(W2 *w2)
 {
 	size_t goal_cnt = 0;
 
-	for (; goal_cnt < w1->goal_num; ++goal_cnt)
-		func_check(w1, w1->goals[goal_cnt]);
+	for (; goal_cnt < w2->goal_num; ++goal_cnt)
+		func_check(w2, w2->goals[goal_cnt]);
 }
 
 void
@@ -65,32 +72,33 @@ funcs_free(void *key, void *storage)
 int
 main(int argc, char *argv[])
 {
-	W1 w1 = {
+	W2 w2 = {
 		.goals = goals,
 		.goal_num = ARRAY_SIZE(goals),
 		.funcs = bimap_new(0, 0),
 		.stuff = hset_new(0),
+		.bound_max = 2
 	};
 
 	(void) argc;
 	(void) argv;
 
-	bimap_add(w1.funcs,
+	bimap_add(w2.funcs,
 		  &(int){ 4 }, sizeof(int),
 		  &(int){ 1 }, sizeof(int));
-	bimap_add(w1.funcs,
+	bimap_add(w2.funcs,
 		  &(int){ 5 }, sizeof(int),
 		  &(int){ 2 }, sizeof(int));
-	bimap_add(w1.funcs,
+	bimap_add(w2.funcs,
 		  &(int){ 6 }, sizeof(int),
 		  &(int){ 3 }, sizeof(int));
 
-	hset_copy_add(w1.stuff, &(int){ 4 }, sizeof(int));
-	hset_copy_add(w1.stuff, &(int){ 5 }, sizeof(int));
-	hset_copy_add(w1.stuff, &(int){ 6 }, sizeof(int));
+	hset_copy_add(w2.stuff, &(int){ 4 }, sizeof(int));
+	hset_copy_add(w2.stuff, &(int){ 5 }, sizeof(int));
+	hset_copy_add(w2.stuff, &(int){ 6 }, sizeof(int));
 
-	run(&w1);
+	run(&w2);
 
-	hset_free(w1.stuff, stuff_free);
-	bimap_free(w1.funcs, funcs_free, funcs_free);
+	hset_free(w2.stuff, stuff_free);
+	bimap_free(w2.funcs, funcs_free, funcs_free);
 }
