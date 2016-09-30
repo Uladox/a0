@@ -72,5 +72,8 @@ main(int argc, char *argv[])
 		.stuff_num = ARRAY_SIZE(stuff)
 	};
 
+	(void) argc;
+	(void) argv;
+
 	run(&w0);
 }
