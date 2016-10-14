@@ -33,6 +33,14 @@ typedef struct {
 } Bound_list;
 
 typedef struct {
+	const char *name;
+        Nit_hset *knows;
+        Nit_hset *wants;
+} Cog;
+
+typedef struct {
+	Cog *person;
+
 	int *goals;
 	size_t goal_num;
 
@@ -43,6 +51,35 @@ typedef struct {
 	int steps;
 	Bound_list *bounds;
 } W3;
+
+Cog *
+cog_new(const char *name)
+{
+	Cog *cog = palloc(cog);
+
+	cog->name = name;
+	cog->knows = hset_new(0);
+	cog->wants = hset_new(0);
+
+	return cog;
+}
+
+int
+ask(Cog *cog, int prob)
+{
+	int resp;
+
+	printf(":%s %i? ", cog->name, prob);
+	scanf("%i", &resp);
+
+	return resp;
+}
+
+void
+say(Cog *cog, int prob, int resp)
+{
+	printf(":%s %i -> %i!\n", cog->name, prob, resp);
+}
 
 Bound *
 bound_new(Nit_entry_list *point, Bound *super)
@@ -90,27 +127,49 @@ w3_add_list(W3 *w3, int goal)
 	list->goal = goal;
 }
 
+void
+finish_up(Bound_list *list, W3 *w3, int goal, int in)
+{
+	printf("%i -> %i\n", in, goal);
+
+	if (hset_contains(w3->person->wants, &goal, sizeof(goal)))
+		say(w3->person, in, goal);
+
+	hset_copy_add(w3->stuff, &goal, sizeof(goal));
+
+	dlist_remove(list);
+
+	if (list->bound)
+		bound_free(list->bound);
+
+	if (w3->bounds == list)
+		w3->bounds = NULL;
+
+	free(list);
+}
+
 int
 goal_check(Bound_list *list, W3 *w3, int goal, int in)
 {
-	if (hset_contains(w3->stuff, &in, sizeof(in))) {
-		printf("%i -> %i\n", in, goal);
-		hset_copy_add(w3->stuff, &goal, sizeof(goal));
+	if (!hset_contains(w3->stuff, &in, sizeof(in)))
+		return 0;
 
-		dlist_remove(list);
+	finish_up(list, w3, goal, in);
 
-		if (list->bound)
-			bound_free(list->bound);
+	return 1;
+}
 
-		if (w3->bounds == list)
-			w3->bounds = NULL;
+int
+ask_check(Bound_list *list, W3 *w3, int goal)
+{
+	int in;
 
-		free(list);
+	if ((in = ask(w3->person, goal)) == -1)
+		return 0;
 
-		return 1;
-	}
+	finish_up(list, w3, goal, in);
 
-	return 0;
+	return 1;
 }
 
 static inline int
@@ -147,6 +206,9 @@ bound_check(Bound_list *list, W3 *w3, int goal)
 
 	while (w3->steps > 0 && list->bound->point) {
 		if (goal_check(list, w3, goal, (dat = bound_dat(list->bound))))
+			return 1;
+
+		if (ask_check(list, w3, goal))
 			return 1;
 
 	        if (!func_check(list, w3, dat))
@@ -208,6 +270,7 @@ int
 main(int argc, char *argv[])
 {
 	W3 w3 = {
+		.person = cog_new("person"),
 		.goals = goals,
 		.goal_num = ARRAY_SIZE(goals),
 		.funcs = bimap_new(0, 0),
@@ -234,6 +297,8 @@ main(int argc, char *argv[])
 
 	hset_copy_add(w3.stuff, &(int){ 4 }, sizeof(int));
 	hset_copy_add(w3.stuff, &(int){ 6 }, sizeof(int));
+
+	hset_copy_add(w3.person->wants, &(int){ 2 }, sizeof(int));
 
 	run(&w3);
 
