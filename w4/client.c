@@ -21,10 +21,12 @@ main(int argc, char *argv[])
 	(void) argc;
 	(void) argv;
 
+	printf("kwt v. a0-w4 d. 11/14/16\n");
+
 	fgets(buf, 255, stdin);
 	msg_size = strlen(buf);
-	printf("msg_size: %" PRIi32 "\n",
-	       msg_size);
+	/* printf("msg_size: %" PRIi32 "\n", */
+	/*        msg_size); */
 	joint_send(jnt, buf, msg_size);
 	sleep(10);
 	joint_free(jnt);

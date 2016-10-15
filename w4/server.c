@@ -6,7 +6,6 @@
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/un.h>
-#include <unistd.h>
 
 #define NIT_SHORT_NAMES
 #include <nit/macros.h>
@@ -35,49 +34,26 @@ funcs_free(void *key, void *storage)
 	bimap_storage_free(storage);
 }
 
-void
-server_loop(Nit_joint *jnt)
-{
-	char *buf = malloc(256);
-	int32_t size = 256;
-
-	while (1) {
-		int32_t msg_size;
-		int val;
-
-		switch (val = joint_read(jnt, &buf, &size, &msg_size, 1)) {
-		case NIT_JOIN_CLOSED:
-			return;
-		case NIT_JOIN_ERROR:
-			printf("ERROR!\n");
-			return;
-		case NIT_JOIN_OK:
-			printf("msg_size: %" PRIi32 "\n", msg_size);
-			buf[msg_size] = '\0';
-			printf("buf: %s\n", buf);
-		case NIT_JOIN_NONE:
-			printf("val: %i\n", val);
-			sleep(1);
-		}
-	}
-}
-
 int
 main(int argc, char *argv[])
 {
+	Nit_joiner *jnr = joiner_new("kwt");
+	Nit_joint *jnt = joiner_accept(jnr);
+
 	Wi wi = {
-		.person = cog_new("person"),
+		.person = cog_new("person", jnt),
 		.goals = goals,
 		.goal_num = ARRAY_UNITS(goals),
 		.funcs = bimap_new(0, 0),
 		.stuff = hset_new(0),
-		.bound_max = 2,
+		.bound_max = 1,
 		.bounds = NULL
 	};
 
 	(void) argc;
 	(void) argv;
 
+	/* 4 -> 1, 6 -> 5, 5 -> 3, 3 -> 2 */
 	bimap_add(wi.funcs,
 		  &(int){ 4 }, sizeof(int),
 		  &(int){ 1 }, sizeof(int));
@@ -91,6 +67,7 @@ main(int argc, char *argv[])
 		  &(int){ 3 }, sizeof(int),
 		  &(int){ 2 }, sizeof(int));
 
+	/* 4, 6 */
 	hset_copy_add(wi.stuff, &(int){ 4 }, sizeof(int));
 	hset_copy_add(wi.stuff, &(int){ 6 }, sizeof(int));
 
@@ -100,8 +77,4 @@ main(int argc, char *argv[])
 
 	hset_free(wi.stuff, stuff_free);
 	bimap_free(wi.funcs, funcs_free, funcs_free);
-
-	Nit_joiner *jnr = joiner_new("kwt");
-	Nit_joint *jnt = joiner_accept(jnr);
-	server_loop(jnt);
 }

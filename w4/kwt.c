@@ -1,6 +1,11 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <pthread.h>
+#include <sys/select.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <unistd.h>
 
 #define NIT_SHORT_NAMES
 #include <nit/palloc.h>
@@ -8,32 +13,91 @@
 #include <nit/hset.h>
 #include <nit/hmap.h>
 #include <nit/bimap.h>
+#include <nit/socket.h>
 
 #include "kwt.h"
 
 #define LIST_INC(LIST) LIST = LIST_NEXT(LIST)
 
 Cog *
-cog_new(const char *name)
+cog_new(const char *name, Nit_joint *in)
 {
 	Cog *cog = palloc(cog);
 
 	cog->name = name;
+	cog->in = in;
 	cog->knows = hset_new(0);
 	cog->wants = hset_new(0);
 
 	return cog;
 }
 
+enum nit_join_status
+input_get(Nit_joint *in, int *resp)
+{
+	char *buf = malloc(256);
+	int32_t size = 256;
+
+	int timer = 5;
+	int timer2 = 5;
+	int check_num = 1;
+
+	while (1) {
+		int32_t msg_size;
+		int val;
+
+		switch (val = joint_read(in, &buf, &size, &msg_size, 1)) {
+		case NIT_JOIN_CLOSED:
+		case NIT_JOIN_ERROR:
+			/* printf("val: %i\n", val); */
+			sleep(1);
+			return val;
+		case NIT_JOIN_NONE:
+
+			if (timer2) {
+				if (timer) {
+					--timer;
+				} else {
+					--timer2;
+
+					if (check_num) {
+						printf("there?\n");
+						check_num = 0;
+					}
+				}
+			} else {
+				printf("bye!\n");
+				return NIT_JOIN_CLOSED;
+			}
+
+			sleep(1);
+			continue;
+		case NIT_JOIN_OK:
+			buf[msg_size] = '\0';
+			*resp = atoi(buf);
+			/* printf("val: %i\n", val); */
+			sleep(1);
+			return NIT_JOIN_OK;
+			/* printf("msg_size: %" PRIi32 "\n", msg_size); */
+			/* printf("buf: %s\n", buf); */
+		}
+	}
+}
+
 int
-ask(Cog *cog, int prob)
+ask(Wi *wi, Cog *cog, int prob)
 {
 	int resp;
 
-	printf(":%s %i? ", cog->name, prob);
-	scanf("%i", &resp);
+	printf(":%s %i?\n", cog->name, prob);
 
-	return resp;
+        switch (input_get(cog->in, &resp)) {
+	case NIT_JOIN_OK:
+		return resp;
+	default:
+		wi->person = NULL;
+		return -1;
+	}
 }
 
 void
@@ -93,7 +157,7 @@ finish_up(Bound_list *list, Wi *wi, int goal, int in)
 {
 	printf("%i -> %i\n", in, goal);
 
-	if (hset_contains(wi->person->wants, &goal, sizeof(goal)))
+	if (wi->person && hset_contains(wi->person->wants, &goal, sizeof(goal)))
 		say(wi->person, in, goal);
 
 	hset_copy_add(wi->stuff, &goal, sizeof(goal));
@@ -125,7 +189,7 @@ ask_check(Bound_list *list, Wi *wi, int goal)
 {
 	int in;
 
-	if ((in = ask(wi->person, goal)) == -1)
+	if ((in = ask(wi, wi->person, goal)) == -1)
 		return 0;
 
 	finish_up(list, wi, goal, in);
@@ -173,10 +237,9 @@ bound_check(Bound_list *list, Wi *wi, int goal)
 			LIST_INC(list->bound->point);
 
 		if (--wi->steps <= 0) {
-			if (ask_check(list, wi, goal))
-				return 1;
-			else
-				return 0;
+			if (wi->person)
+				return ask_check(list, wi, goal);
+			return 0;
 		}
 	}
 

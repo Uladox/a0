@@ -1,10 +1,15 @@
 /* Include these
  * #include <stdint.h>
  * #include <stdlib.h>
+ * #include <pthread.h>
+ * #include <sys/select.h>
+ * #include <sys/socket.h>
+ * #include <sys/un.h>
  * #include <nit/list.h>
  * #include <nit/hset.h>
  * #include <nit/hmap.h>
  * #include <nit/bimap.h>
+ * #include <nit/socket.h>
  */
 
 typedef struct bound Bound;
@@ -24,6 +29,7 @@ typedef struct {
 	const char *name;
         Nit_hset *knows;
         Nit_hset *wants;
+	Nit_joint *in;
 } Cog;
 
 typedef struct {
@@ -41,7 +47,7 @@ typedef struct {
 } Wi;
 
 Cog *
-cog_new(const char *name);
+cog_new(const char *name, Nit_joint *in);
 
 void
 run(Wi *wi);
