@@ -6,6 +6,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
+#include <time.h>
 
 #define NIT_SHORT_NAMES
 #include <nit/palloc.h>
@@ -38,9 +39,13 @@ input_get(Nit_joint *in, int *resp)
 	char *buf = malloc(256);
 	int32_t size = 256;
 
-	int timer = 5;
-	int timer2 = 5;
+	double timer = 5;
+	double timer2 = timer + 5;
+	time_t start, end;
+	double diff;
 	int check_num = 1;
+
+	time(&start);
 
 	while (1) {
 		int32_t msg_size;
@@ -54,20 +59,16 @@ input_get(Nit_joint *in, int *resp)
 			return val;
 		case NIT_JOIN_NONE:
 
-			if (timer2) {
-				if (timer) {
-					--timer;
-				} else {
-					--timer2;
+			time(&end);
+			diff = difftime(end, start);
 
-					if (check_num) {
-						printf("there?\n");
-						check_num = 0;
-					}
-				}
-			} else {
+			if (diff > timer2) {
 				printf("bye!\n");
+
 				return NIT_JOIN_CLOSED;
+			} else if (diff > timer && check_num) {
+				printf("there?\n");
+				check_num = 0;
 			}
 
 			sleep(1);

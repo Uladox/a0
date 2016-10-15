@@ -23,11 +23,19 @@ main(int argc, char *argv[])
 
 	printf("kwt v. a0-w4 d. 11/14/16\n");
 
-	fgets(buf, 255, stdin);
-	msg_size = strlen(buf);
-	/* printf("msg_size: %" PRIi32 "\n", */
-	/*        msg_size); */
-	joint_send(jnt, buf, msg_size);
-	sleep(10);
+	while (1) {
+		printf("> ");
+
+		if (!fgets(buf, 255, stdin)) {
+			printf("\n");
+			break;
+		}
+
+		msg_size = strlen(buf);
+
+		if (!joint_send(jnt, buf, msg_size))
+			break;
+	}
+
 	joint_free(jnt);
 }
