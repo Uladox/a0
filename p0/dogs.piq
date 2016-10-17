@@ -1,0 +1,20 @@
+"How did the dog feel when he saw a monster"
+"terrier-fied"
+monster => "terrified"
+dog     => "terrier"
+----------------------
+pun        "terrier-fied"
+
+(@x see @y) => (@x knowAbout @y)
+scary => terrified
+
+
+(pet)
+(areScary fleas )
+(type corgi anomalie)
+(syzygy "terrier-fied"
+  (joke dog saw monster)
+    (monser is scary)
+    ((saw monster) means know
+  (terrier type dog)
+  (

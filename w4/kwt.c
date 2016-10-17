@@ -54,7 +54,6 @@ input_get(Nit_joint *in, int *resp)
 		switch (val = joint_read(in, &buf, &size, &msg_size, 1)) {
 		case NIT_JOIN_CLOSED:
 		case NIT_JOIN_ERROR:
-			/* printf("val: %i\n", val); */
 			sleep(1);
 			return val;
 		case NIT_JOIN_NONE:
@@ -76,11 +75,8 @@ input_get(Nit_joint *in, int *resp)
 		case NIT_JOIN_OK:
 			buf[msg_size] = '\0';
 			*resp = atoi(buf);
-			/* printf("val: %i\n", val); */
 			sleep(1);
 			return NIT_JOIN_OK;
-			/* printf("msg_size: %" PRIi32 "\n", msg_size); */
-			/* printf("buf: %s\n", buf); */
 		}
 	}
 }
