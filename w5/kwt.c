@@ -48,9 +48,6 @@ input_get(Cog *cog, int *resp)
 	time_t end;
 	double diff;
 
-	if (!cog->asked)
-		time(&cog->timer);
-
 	while (1) {
 		int32_t msg_size;
 		int val;
@@ -61,6 +58,9 @@ input_get(Cog *cog, int *resp)
 			sleep(1);
 			return val;
 		case NIT_JOIN_NONE:
+
+			if (!cog->asked)
+				return NIT_JOIN_NONE;
 
 			time(&end);
 			diff = difftime(end, cog->timer);
@@ -87,27 +87,13 @@ input_get(Cog *cog, int *resp)
 }
 
 void
-ask(Bound_list *list, Cog *cog, int prob)
+ask(Goal_list *list, Cog *cog, int prob)
 {
 	printf(":%s %i?\n", cog->name, prob);
+	cog->asked = 1;
 	cog->goal = prob;
 	cog->list = list;
-}
-
-int
-response(Wi *wi, Cog *cog)
-{
-	int resp;
-
-        switch (input_get(cog, &resp)) {
-	case NIT_JOIN_OK:
-		return resp;
-	case NIT_JOIN_NONE:
-		return -1;
-	default:
-		wi->person = NULL;
-		return -1;
-	}
+	time(&cog->timer);
 }
 
 void
@@ -128,7 +114,7 @@ bound_new(Nit_entry_list *point, Bound *super)
 }
 
 Bound *
-bound_list_set(Bound_list *list, Nit_entry_list *point)
+goal_list_set(Goal_list *list, Nit_entry_list *point)
 {
 	Bound *bound = bound_new(point, list->bound);
 
@@ -147,28 +133,19 @@ bound_free(Bound *bound)
 }
 
 void
-wi_add_list(Wi *wi, int goal)
-{
-	Bound_list *list = palloc(list);
-
-	LIST_CONS(list, wi->bounds);
-	DLIST_RCONS(list, NULL);
-
-	if (wi->bounds)
-		DLIST_RCONS(wi->bounds, list);
-
-	list->bound = NULL;
-	wi->bounds = list;
-	list->goal = goal;
-}
-
-void
-finish_up(Bound_list *list, Wi *wi, int goal, int in)
+finish_up(Goal_list *list, Wi *wi, int goal, int in)
 {
 	printf("%i -> %i\n", in, goal);
 
-	if (wi->person && hset_contains(wi->person->wants, &goal, sizeof(goal)))
-		say(wi->person, in, goal);
+	if (wi->person) {
+		if (hset_contains(wi->person->wants, &goal, sizeof(goal)))
+			say(wi->person, in, goal);
+		if (wi->person->goal == goal) {
+			wi->person->asked = 0;
+			wi->person->goal = -1;
+			wi->person->list = NULL;
+		}
+	}
 
 	hset_copy_add(wi->stuff, &goal, sizeof(goal));
 
@@ -177,14 +154,14 @@ finish_up(Bound_list *list, Wi *wi, int goal, int in)
 	if (list->bound)
 		bound_free(list->bound);
 
-	if (wi->bounds == list)
-		wi->bounds = NULL;
+	if (wi->goals == list)
+		wi->goals = LIST_NEXT(list);
 
 	free(list);
 }
 
 int
-goal_check(Bound_list *list, Wi *wi, int goal, int in)
+goal_check(Goal_list *list, Wi *wi, int goal, int in)
 {
 	if (!hset_contains(wi->stuff, &in, sizeof(in)))
 		return 0;
@@ -201,7 +178,7 @@ bound_dat(Bound *bound)
 }
 
 int
-func_check(Bound_list *list, Wi *wi, int goal)
+func_check(Goal_list *list, Wi *wi, int goal)
 {
 	Nit_entry_list *ins = bimap_rget(wi->funcs, &goal, sizeof(goal));
 	Bound *bound;
@@ -216,17 +193,18 @@ func_check(Bound_list *list, Wi *wi, int goal)
 		return 0;
 	}
 
-        bound_list_set(list, ins);
+        goal_list_set(list, ins);
 
 	return 1;
 }
 
+/* for a specific goal */
 int
-bound_check(Bound_list *list, Wi *wi, int goal)
+bound_check(Goal_list *list, Wi *wi, int goal)
 {
 	int dat;
 
-	printf("%i\n", goal);
+	/* printf("%i\n", goal); */
 
 	while (wi->steps > 0 && list->bound && list->bound->point) {
 		if (goal_check(list, wi, goal, (dat = bound_dat(list->bound))))
@@ -235,50 +213,87 @@ bound_check(Bound_list *list, Wi *wi, int goal)
 	        if (!func_check(list, wi, dat))
 			LIST_INC(list->bound->point);
 
-		int resp;
-		if (wi->person)
-			if ((resp = response(wi, wi->person)) >= 0) {
-				printf("resp\n");
-				/* finish_up(list, wi, wi->person->goal, resp); */
-			}
-
-		if (--wi->steps <= 0) {
-			if (wi->person && wi->person->goal < 0)
-				ask(list, wi->person, goal);
-
-			return 0;
-		}
+		if (--wi->steps <= 0)
+			break;
 	}
+
+	if (wi->person && wi->person->goal < 0)
+		ask(list, wi->person, goal);
 
 	return 0;
 }
 
-int
-check_bounds(Wi *wi)
+void
+response(Wi *wi, Cog *cog)
 {
-	int work = 0;
-	Bound_list *list = wi->bounds;
-	Bound_list *tmp;
+	int resp;
+
+	switch (input_get(cog, &resp)) {
+	case NIT_JOIN_ERROR:
+	case NIT_JOIN_CLOSED:
+		wi->person = NULL;
+	case NIT_JOIN_NONE:
+		return;
+	case NIT_JOIN_OK:
+		finish_up(cog->list, wi, cog->goal, resp);
+		return;
+	}
+}
+
+int
+check_goals(Wi *wi)
+{
+	Goal_list *list = wi->goals;
+	Goal_list *tmp;
 
 	delayed_foreach (tmp, list) {
-		if (!bound_check(tmp, wi, tmp->goal))
-			work = 1;
+	        bound_check(tmp, wi, tmp->goal);
+
+		if (!wi->person)
+			return 0;
+
+		/* Used to check for disconnect even if no queston asked */
+		response(wi, wi->person);
 
 		wi->steps = wi->bound_max;
 	}
 
-	return work;
+	return !!wi->goals;
+}
+
+void
+wi_add_list(Wi *wi, int goal)
+{
+	Goal_list *list = palloc(list);
+	Nit_entry_list *ins = bimap_rget(wi->funcs, &goal, sizeof(goal));
+
+	LIST_CONS(list, wi->goals);
+	DLIST_RCONS(list, NULL);
+
+	if (wi->goals)
+		DLIST_RCONS(wi->goals, list);
+
+	if (!ins)
+		list->bound = NULL;
+	else
+		goal_list_set(list, ins);
+
+	wi->goals = list;
+	list->goal = goal;
+}
+
+void
+add_goals(Wi *wi)
+{
+	size_t goal_cnt = 0;
+
+	for (; goal_cnt < wi->goal_num; ++goal_cnt)
+	        wi_add_list(wi, wi->goal_arr[goal_cnt]);
 }
 
 void
 run(Wi *wi)
 {
-	size_t goal_cnt = 0;
-
-	for (; goal_cnt < wi->goal_num; ++goal_cnt) {
-	        wi_add_list(wi, wi->goals[goal_cnt]);
-		func_check(wi->bounds, wi, wi->goals[goal_cnt]);
-	}
-
-	while (check_bounds(wi));
+	add_goals(wi);
+	while (check_goals(wi));
 }

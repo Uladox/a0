@@ -23,7 +23,7 @@ typedef struct {
 	Nit_dlist list;
 	Bound *bound;
 	int goal;
-} Bound_list;
+} Goal_list;
 
 typedef struct {
 	const char *name;
@@ -37,13 +37,13 @@ typedef struct {
 	double s_span;
 	int bored;
 	double a_span;
-	Bound_list *list;
+        Goal_list *list;
 } Cog;
 
 typedef struct {
 	Cog *person;
 
-	int *goals;
+	int *goal_arr;
 	size_t goal_num;
 
 	Nit_bimap *funcs;
@@ -51,7 +51,7 @@ typedef struct {
 
 	int bound_max;
 	int steps;
-	Bound_list *bounds;
+	Goal_list *goals;
 } Wi;
 
 Cog *
