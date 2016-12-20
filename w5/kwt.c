@@ -18,7 +18,7 @@
 
 #include "kwt.h"
 
-#define LIST_INC(LIST) LIST = LIST_NEXT(LIST)
+/* #define LIST_INC(LIST) LIST = LIST_NEXT(LIST) */
 
 Cog *
 cog_new(const char *name, Nit_joint *in, double s_span, double a_span)

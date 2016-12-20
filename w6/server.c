@@ -47,7 +47,7 @@ main(int argc, char *argv[])
 		.funcs = bimap_new(0, 0),
 		.stuff = hset_new(0),
 		.bound_max = 1,
-		.bounds = NULL
+		.goals = NULL
 	};
 
 	(void) argc;
