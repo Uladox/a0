@@ -32,3 +32,9 @@
 *.dSYM/
 *.su
 /r0/main
+/tra/main
+/w4/client
+/w4/server
+/w5/client
+/w6/client
+/w6/server
